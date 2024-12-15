@@ -11,7 +11,7 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-#Load the required packages
+# Load the required packages
 ```{r}
 library(tidyverse)
 library(car)
@@ -19,13 +19,13 @@ library(car)
 ```
 
 
-#Import the dataset
+# Import the dataset
 ```{r}
 english_education <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-01-23/english_education.csv')
 
 ```
 
-#Inspect the data
+# Inspect the data
 ```{r}
 glimpse(english_education)
 
@@ -42,7 +42,7 @@ english_education %>%
   tail()
 ```
 
-#Exploratory data analysis:demographics and regions
+# Exploratory data analysis:demographics and regions
 
 ```{r}
 english_education %>% 
@@ -64,7 +64,7 @@ ggplot(english_education, aes(x = size_flag)) +
 
 ```
 
-#Barplot: coastal
+# Barplot: coastal
 
 ```{r}
 ggplot(english_education, aes(x = coastal)) +
@@ -73,7 +73,7 @@ ggplot(english_education, aes(x = coastal)) +
 
 ```
 
-#Plot coastal and non-coastal mean education score
+# Plot coastal and non-coastal mean education score
 
 ```{r}
 ggplot(english_education %>% filter(!is.na(coastal) & !is.na(education_score)), 
@@ -89,7 +89,7 @@ ggplot(english_education %>% filter(!is.na(coastal) & !is.na(education_score)),
 ```
 
 
-#Explore the variables: education score, population_2011, university_flag
+# Explore the variables: education score, population_2011, university_flag
 ```{r}
 # Distribution of education_score
 
@@ -133,7 +133,7 @@ ggplot(english_education, aes(x = university_flag, y = education_score, fill = u
 
 
 
-#Hypothesis testing: 
+# Hypothesis testing: 
 ## H1 Higher population leads to better education scores.
 ## H2 Having a university in a town/city leads to better education scores.
 ## H3 There is an interaction between population size and university presence, where a smaller town with a university might have better education scores than a larger town without a university.
@@ -190,7 +190,7 @@ cleaned_data <- english_education[-influential_points, ]
 
 ```
 
-#Build the new model 
+# Build the new model 
 
 ```{r}
 new_model <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = cleaned_data)
@@ -198,7 +198,7 @@ new_model <- lm(education_score ~ population_2011 + university_dummy + populatio
 summary(new_model)
 ```
 
-#Check the assumptions witht the new model
+# Check the assumptions witht the new model
 ```{r}
 # Check residuals for normality, linearity, homoscedascity 
 
@@ -216,7 +216,7 @@ linearity and homoscedascity assumptions are still not met
 
 Lets see these hypothesis only in case of "small towns'.
 
-#Small Towns: hypothesis testing
+# Small Towns: hypothesis testing
 ```{r}
 small_towns <- english_education %>% filter(size_flag == "Small Towns")
 
@@ -232,7 +232,7 @@ summary(model_small_towns)
 
 ```
 
-#Check assumptions
+# Check assumptions
 ```{r}
 # Check residuals for normality, linearity, homoscedascity 
 
@@ -247,7 +247,7 @@ vif(model_small_towns)
 
 ```
 
-#Identify influential cases in the model for small town
+# Identify influential cases in the model for small town
 ```{r}
 cooks_distance <- cooks.distance(model_small_towns)
 
@@ -258,7 +258,7 @@ cleaned_data_small <- small_towns[-influential_points_small, ]
 
 The influential cases are the ones with universities. 
 
-#Build the new model for small towns
+# Build the new model for small towns
 
 ```{r}
 new_model_small <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = cleaned_data_small)
