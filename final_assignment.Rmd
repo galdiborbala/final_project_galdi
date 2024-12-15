@@ -176,7 +176,7 @@ vif(model)
 ```
 Linearity and homoscedascity assumptions are not met.
 
-#Identify and clean out influential points with cook's distance 
+# Identify and clean out influential points with cook's distance 
 ```{r}
 cooks_distance <- cooks.distance(model)
 
