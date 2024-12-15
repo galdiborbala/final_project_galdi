@@ -1,0 +1,291 @@
+---
+title: "final_project"
+author: "Gáldi Borbála"
+date: "2024-12-14"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load the required packages
+```{r}
+library(tidyverse)
+library(car)
+
+```
+
+
+#Import the dataset
+```{r}
+english_education <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/main/data/2024/2024-01-23/english_education.csv')
+
+```
+
+#Inspect the data
+```{r}
+glimpse(english_education)
+
+str(english_education)
+
+summary(english_education)
+
+skim(english_education)
+
+tail(english_education)
+
+english_education %>%
+  arrange(education_score) %>%
+  tail()
+```
+
+#Exploratory data analysis:demographics and regions
+
+```{r}
+english_education %>% 
+    group_by(rgn11nm) %>% 
+    summarise(mean_population = mean(population_2011, na.rm = TRUE)) %>%
+    ggplot(aes(x = reorder(rgn11nm, mean_population), y = mean_population)) +
+    geom_col() +
+    coord_flip() +
+    labs(title = "Average Population by Region", x = "Region", y = "Average Population")
+
+```
+
+
+# Barplot: size 
+```{r}
+ggplot(english_education, aes(x = size_flag)) +
+  geom_bar(fill = "green") +
+  labs(title = "Count of Towns by Size", x = "Size Category", y = "Count")
+
+```
+
+#Barplot: coastal
+
+```{r}
+ggplot(english_education, aes(x = coastal)) +
+  geom_bar(fill = "blue") +
+  labs(title = "Count of Towns by Size", x = "Size Category", y = "Count")
+
+```
+
+#Plot coastal and non-coastal mean education score
+
+```{r}
+ggplot(english_education %>% filter(!is.na(coastal) & !is.na(education_score)), 
+       aes(x = coastal, y = education_score, fill = coastal)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 3, color = "darkblue") +
+  labs(title = "Education Scores: Coastal vs Non-Coastal Towns",
+       x = "Coastal Classification",
+       y = "Education Score") +
+  theme_minimal() +
+  scale_fill_manual(values = c("orange", "lightblue"))
+
+```
+
+
+#Explore the variables: education score, population_2011, university_flag
+```{r}
+# Distribution of education_score
+
+ggplot(english_education, aes(x = education_score)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of Education Score", x = "Education Score", y = "Count") +
+  theme_minimal()
+
+# Distribution of population_2011
+
+ggplot(english_education, aes(x = population_2011)) +
+  geom_histogram(bins = 30, fill = "lightgreen", color = "black") +
+  labs(title = "Distribution of Population in 2011", x = "Population", y = "Count") +
+  theme_minimal()
+
+# Bar plot for university_flag (No University vs University)
+
+ggplot(english_education, aes(x = university_flag, fill = university_flag)) +
+  geom_bar() +
+  labs(title = "Count of Towns with/without University", x = "University Flag", y = "Count") +
+  theme_minimal()
+
+# Scatter plot for education_score vs population_2011, colored by university_flag
+
+ggplot(english_education, aes(x = population_2011, y = education_score, color = university_flag)) +
+  geom_point() +
+  labs(title = "Education Score vs Population (Colored by University Flag)", 
+       x = "Population in 2011", y = "Education Score") +
+  theme_minimal() +
+  scale_color_manual(values = c("No university" = "red", "University" = "blue"))
+
+
+# Boxplot for education_score by university_flag
+
+ggplot(english_education, aes(x = university_flag, y = education_score, fill = university_flag)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16) +
+  labs(title = "Education Score by University Flag", x = "University Flag", y = "Education Score") +
+  theme_minimal() +
+  scale_fill_manual(values = c("No university" = "orange", "University" = "lightblue"))
+```
+
+
+
+#Hypothesis testing: 
+## H1 Higher population leads to better education scores.
+## H2 Having a university in a town/city leads to better education scores.
+## H3 There is an interaction between population size and university presence, where a smaller town with a university might have better education scores than a larger town without a university.
+
+```{r}
+# Dummy code the 'university_flag' variable
+
+english_education$university_flag <- factor(english_education$university_flag, levels = c("No university", "University"))
+
+english_education$university_dummy <- ifelse(english_education$university_flag == "University", 1, 0)
+
+
+# Build the linear regression model
+
+model <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = english_education)
+
+summary(model)
+
+
+```
+
+The linear regression model shows that population size has a significant negative relationship with education scores (Estimate = -1.396e-05, p = 0.00108). However, the university presence (university_dummy) is not significant (Estimate = 0.3396, p = 0.61611), and the interaction between population size and university presence is also not significant (Estimate = 7.412e-06, p = 0.13514). The model's R-squared value is 0.01689, indicating a weak fit. The residual standard error is 3.591, with a significant F-statistic (p = 0.0003181).
+
+
+
+# Check the assumtions of the model 
+
+```{r}
+# Check residuals for normality, linearity, homoscedascity 
+
+par(mfrow = c(2, 2)) 
+
+plot(model)
+
+#Check for multicollinearity
+
+vif(model)
+
+
+```
+Linearity and homoscedascity assumptions are not met.
+
+#Identify and clean out influential points with cook's distance 
+```{r}
+cooks_distance <- cooks.distance(model)
+
+influential_points <- which(cooks_distance > (4 / length(cooks_distance)))
+
+influential_points
+cooks_distance[influential_points]
+
+cleaned_data <- english_education[-influential_points, ]
+
+
+```
+
+#Build the new model 
+
+```{r}
+new_model <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = cleaned_data)
+
+summary(new_model)
+```
+
+#Check the assumptions witht the new model
+```{r}
+# Check residuals for normality, linearity, homoscedascity 
+
+par(mfrow = c(2, 2)) 
+
+plot(new_model)
+
+#Check for multicollinearity
+
+vif(new_model)
+```
+
+
+linearity and homoscedascity assumptions are still not met
+
+Lets see these hypothesis only in case of "small towns'.
+
+#Small Towns: hypothesis testing
+```{r}
+small_towns <- english_education %>% filter(size_flag == "Small Towns")
+
+small_towns$university_flag <- factor(small_towns$university_flag, levels = c("No university", "University"))
+
+small_towns$university_dummy <- ifelse(small_towns$university_flag == "University", 1, 0)
+
+model_small_towns <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = small_towns)
+
+
+summary(model_small_towns)
+
+
+```
+
+#Check assumptions
+```{r}
+# Check residuals for normality, linearity, homoscedascity 
+
+par(mfrow = c(2, 2)) 
+
+plot(model_small_towns)
+
+#Check for multicollinearity
+
+vif(model_small_towns)
+
+
+```
+
+#Identify influential cases in the model for small town
+```{r}
+cooks_distance <- cooks.distance(model_small_towns)
+
+influential_points_small <- which(cooks_distance > (4 / length(cooks_distance)))
+
+cleaned_data_small <- small_towns[-influential_points_small, ]
+```
+
+The influential cases are the ones with universities. 
+
+#Build the new model for small towns
+
+```{r}
+new_model_small <- lm(education_score ~ population_2011 + university_dummy + population_2011 * university_dummy, data = cleaned_data_small)
+
+summary(new_model_small)
+
+```
+
+
+The linear regression model, after filtering out the influential cases (all of which had universities), shows that population size has a marginally significant negative relationship with education scores (Estimate = -6.018e-05, p = 0.0810). The university presence is not included in the model due to singularities. The model's R-squared value is very low (0.004647), indicating a weak fit, with a residual standard error of 3.843. The F-statistic is 3.053 (p = 0.08104). However, the assumptions of the model are met following the removal of the influential points.
+
+
+```{r}
+# Check residuals for normality, linearity, homoscedascity 
+
+par(mfrow = c(2, 2)) 
+
+plot(new_model_small)
+
+#Check for multicollinearity
+
+vif(new_model_small)
+
+```
+
+
+
+
+
+
